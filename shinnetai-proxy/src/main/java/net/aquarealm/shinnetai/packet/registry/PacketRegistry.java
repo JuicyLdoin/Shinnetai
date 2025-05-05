@@ -51,12 +51,20 @@ public class PacketRegistry {
     }
 
     public void register(int id, Class<? extends AbstractPacket<?, ?>> packet) {
-        if (packetMap.containsKey(id)) {
+        register(id, packet, false);
+    }
+
+    public void register(int id, Class<? extends AbstractPacket<?, ?>> packet, boolean override) {
+        if (packetMap.containsKey(id) && !override) {
             throw new IllegalArgumentException("Packet with id " + id + " already exists");
         }
 
+        Class<? extends AbstractPacket<?, ?>> existing = packetMap.put(id, packet);
         idPacketMap.put(packet, id);
-        packetMap.put(id, packet);
+
+        if (existing != null) {
+            idPacketMap.remove(existing);
+        }
     }
 
     public void unregister(int id) {
@@ -70,9 +78,13 @@ public class PacketRegistry {
     }
 
     public void registerAll(PacketRegistry packetRegistry) {
+        registerAll(packetRegistry, false);
+    }
+
+    public void registerAll(PacketRegistry packetRegistry, boolean override) {
         for (Map.Entry<Class<? extends AbstractPacket<?, ?>>, Integer> entry : packetRegistry.idPacketMap.entrySet()) {
             int id = entry.getValue();
-            register(id, entry.getKey());
+            register(id, entry.getKey(), override);
         }
     }
 }
