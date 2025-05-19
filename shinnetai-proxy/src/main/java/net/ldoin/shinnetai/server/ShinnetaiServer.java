@@ -1,0 +1,296 @@
+package net.ldoin.shinnetai.server;
+
+import net.ldoin.shinnetai.ConnectionType;
+import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
+import net.ldoin.shinnetai.exception.ShinnetaiExceptions;
+import net.ldoin.shinnetai.log.ShinnetaiLog;
+import net.ldoin.shinnetai.packet.AbstractPacket;
+import net.ldoin.shinnetai.packet.common.ServerDisablePacket;
+import net.ldoin.shinnetai.packet.registry.PacketRegistry;
+import net.ldoin.shinnetai.server.connection.ShinnetaiConnection;
+import net.ldoin.shinnetai.server.options.ServerOptions;
+import net.ldoin.shinnetai.statistic.server.ShinnetaiConnectionStatistic;
+import net.ldoin.shinnetai.statistic.server.ShinnetaiServerStatistic;
+
+import javax.naming.OperationNotSupportedException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnable {
+
+    protected int freeConnectionId = 1;
+    private final Map<Integer, C> connections;
+
+    private final PacketRegistry registry;
+    private final Logger logger;
+    protected final ServerOptions options;
+    private ServerSocket serverSocket;
+
+    private final ShinnetaiServerStatistic statistic;
+
+    protected Thread workingThread;
+    private volatile boolean running;
+
+    public ShinnetaiServer(ServerOptions options) {
+        this(PacketRegistry.getCommons(), options);
+    }
+
+    public ShinnetaiServer(PacketRegistry registry, ServerOptions options) {
+        this(registry, options, Logger.getLogger("Server (" + options.getPort() + ")"));
+    }
+
+    protected ShinnetaiServer(PacketRegistry registry, ServerOptions options, Logger logger) {
+        ShinnetaiLog.init();
+
+        this.registry = registry;
+        this.connections = new ConcurrentHashMap<>();
+        this.options = options;
+        this.statistic = new ShinnetaiServerStatistic();
+        this.logger = logger;
+
+        Runtime.getRuntime().addShutdownHook(Thread.ofVirtual().unstarted(() -> {
+            if (running) {
+                close();
+            }
+        }));
+    }
+
+    protected int getFreeConnectionId() {
+        int id = freeConnectionId;
+        for (int i = id; i < Integer.MAX_VALUE; i++) {
+            if (!connections.containsKey(i)) {
+                freeConnectionId = ++i;
+                break;
+            }
+        }
+
+        return id;
+    }
+
+    public C getConnection(int id) {
+        return connections.get(id);
+    }
+
+    public Collection<C> getConnections() {
+        return Collections.unmodifiableCollection(connections.values());
+    }
+
+    public void sendPacketToAll(AbstractPacket<?, ?> packet) throws IOException {
+        for (C connection : connections.values()) {
+            connection.sendPacket(packet);
+        }
+    }
+
+    public PacketRegistry getRegistry() {
+        return registry;
+    }
+
+    public Logger getLogger() {
+        return logger;
+    }
+
+    public ShinnetaiServerStatistic getStatistic() {
+        return statistic;
+    }
+
+    public ServerSocket getServerSocket() {
+        return serverSocket;
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public int getMaxConnections() {
+        return options.getMaxConnections();
+    }
+
+    public synchronized void start() {
+        if (running) {
+            throw new UnsupportedOperationException("Server already started");
+        }
+
+        onPreStart();
+        if (workingThread != null) {
+            close();
+        }
+
+        workingThread = Thread.ofVirtual().start(this);
+        running = true;
+        onStart();
+    }
+
+    @Override
+    public void run() {
+        try {
+            serverSocket = new ServerSocket(options.getPort());
+            while (running) {
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    InputStream input = clientSocket.getInputStream();
+
+                    int id;
+                    ConnectionType connectionType;
+
+                    byte[] readBuffer;
+                    ReadOnlySmartByteBuf data;
+                    while (true) {
+                        int available = input.available();
+                        if (available > 0) {
+                            readBuffer = new byte[available];
+                            int bytesRead = input.read(readBuffer);
+                            if (bytesRead > 0) {
+                                data = ReadOnlySmartByteBuf.of(readBuffer);
+                                connectionType = ConnectionType.VALUES[data.readVarInt()];
+                                id = data.readVarInt();
+                                break;
+                            }
+                        }
+                    }
+
+                    C connection = newConnection(clientSocket, connectionType, data);
+                    try {
+                        if (id == 0) {
+                            id = getFreeConnectionId();
+                        }
+
+                        if (connections.containsKey(id)) {
+                            logger.log(Level.WARNING, String.format("Failed connect, id %s is busy", id));
+                            connection.sendException(ShinnetaiExceptions.FAILED_CONNECTION_ID_BUSY);
+                            disconnect(connection);
+                            continue;
+                        }
+
+                        connection.changeConnectionId(id);
+                    } catch (OperationNotSupportedException e) {
+                        logger.log(Level.SEVERE, "Failed connect", e);
+                        connection.sendException(ShinnetaiExceptions.FAILED_ASSIGN_CONNECTION_ID);
+                        disconnect(connection);
+                        continue;
+                    }
+
+                    if (!canAcceptConnection(connection, connectionType, ReadOnlySmartByteBuf.of(data.toBytes()))) {
+                        cannotAccept(connection, connectionType, ReadOnlySmartByteBuf.of(data.toBytes()));
+                        continue;
+                    }
+
+                    statistic.connect(connection);
+                    connections.put(id, connection);
+                    connection.start();
+
+                    connect(connection);
+                } catch (SocketException ignored) {
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, "Failed connect", e);
+                }
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Failed while running server: ", e);
+        } finally {
+            if (running) {
+                close();
+            }
+        }
+    }
+
+    public synchronized void close() {
+        if (!running) {
+            throw new UnsupportedOperationException("Server is not started");
+        }
+
+        running = false;
+        onPreStop();
+
+        try {
+            for (C connection : connections.values()) {
+                connection.sendPacket(new ServerDisablePacket());
+                connection.close(true);
+            }
+
+            Thread.sleep(100);
+        } catch (Exception exception) {
+            logger.log(Level.SEVERE, "Error while disable server", exception);
+        }
+
+        try {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Server could not disable: ", e);
+        }
+
+        if (workingThread != null) {
+            workingThread.interrupt();
+        }
+
+        workingThread = null;
+        connections.clear();
+        freeConnectionId = 1;
+
+        onStop();
+    }
+
+    protected boolean canAcceptConnection(C connection, ConnectionType connectionType, ReadOnlySmartByteBuf data) {
+        return options.getMaxConnections() == 0 || connections.size() < options.getMaxConnections();
+    }
+
+    protected void cannotAccept(C connection, ConnectionType connectionType, ReadOnlySmartByteBuf data) {
+        logger.log(Level.WARNING, "Cannot accept", connection.getConnectionId());
+        try {
+            connection.sendException(ShinnetaiExceptions.CANNOT_ACCEPT_CONNECTION);
+        } catch (IOException exception) {
+            logger.log(Level.SEVERE, "Failed connect", exception);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    protected C newConnection(Socket socket, ConnectionType connectionType, ReadOnlySmartByteBuf data) throws IOException {
+        return (C) new ShinnetaiConnection<>(this, 0, registry, new ShinnetaiConnectionStatistic(statistic), socket);
+    }
+
+    public void connect(C connection) {
+        onConnect(connection);
+    }
+
+    public void disconnect(C connection) {
+        int id = connection.getConnectionId();
+        connections.remove(id);
+        statistic.disconnect(id);
+
+        freeConnectionId = Math.min(id, freeConnectionId);
+
+        onDisconnect(connection);
+    }
+
+    protected void onPreStart() {
+    }
+
+    protected void onStart() {
+        logger.info("Server started");
+    }
+
+    protected void onPreStop() {
+    }
+
+    protected void onStop() {
+        logger.info("Server stopped");
+    }
+
+    protected void onConnect(C connection) {
+        Socket socket = connection.getSocket();
+        logger.info(String.format("Client connected: %d, %s:%d", connection.getConnectionId(), socket.getInetAddress(), socket.getPort()));
+    }
+
+    protected void onDisconnect(C connection) {
+        Socket socket = connection.getSocket();
+        logger.info(String.format("Client disconnected: %d, %s:%d", connection.getConnectionId(), socket.getInetAddress(), socket.getPort()));
+    }
+}

@@ -1,0 +1,57 @@
+package net.ldoin.shinnetai.packet;
+
+import net.ldoin.shinnetai.ShinnetaiIOWorker;
+import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
+import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
+import net.ldoin.shinnetai.packet.side.PacketSide;
+
+public abstract class AbstractPacket<C extends ShinnetaiIOWorker<?>, S extends ShinnetaiIOWorker<?>> {
+
+    private C clientWorker;
+    private S serverWorker;
+
+    public void attachClientWorker(C clientWorker) {
+        this.clientWorker = clientWorker;
+    }
+
+    public void attachServerWorker(S serverWorker) {
+        this.serverWorker = serverWorker;
+    }
+
+    public C getClientWorker() {
+        return clientWorker;
+    }
+
+    public S getServerWorker() {
+        return serverWorker;
+    }
+
+    public PacketSide getHandleSide() {
+        return PacketSide.MULTIPLE;
+    }
+
+    public final void handle(PacketSide side) {
+        if (!getHandleSide().canHandle(side)) {
+            return;
+        }
+
+        switch (side) {
+            case CLIENT -> handleClient();
+            case SERVER -> handleServer();
+        }
+    }
+
+    public void handleClient() {
+    }
+
+    public void handleServer() {
+    }
+
+    public <P extends AbstractPacket<?, ?>> P response() {
+        return null;
+    }
+
+    public abstract void read(ReadOnlySmartByteBuf buf);
+
+    public abstract void write(WriteOnlySmartByteBuf buf);
+}
