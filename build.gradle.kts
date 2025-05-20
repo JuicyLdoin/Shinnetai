@@ -20,10 +20,10 @@ val monoVersion = true
 subprojects {
     group = "net.ldoin"
     if (monoVersion) {
-        version = rootProject.version
+        version = parent!!.version
     }
 
-    apply(plugin = "java")
+    apply("plugin" to "java")
 
     repositories {
         mavenCentral()
