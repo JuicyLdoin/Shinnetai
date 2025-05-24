@@ -46,7 +46,8 @@ public class PacketRegistry {
         return packetMap.get(id);
     }
 
-    public int getId(Class<? extends AbstractPacket<?, ?>> clazz) {
+    @SuppressWarnings("rawtypes")
+    public int getId(Class<? extends AbstractPacket> clazz) {
         return idPacketMap.get(clazz);
     }
 

@@ -66,7 +66,7 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
 
     @Override
     @SuppressWarnings("unchecked")
-    protected ShinnetaiClient self() {
+    public ShinnetaiClient self() {
         return this;
     }
 
@@ -109,7 +109,8 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
             getLogger().info(String.format("Redirecting to %s:%d...", address, port));
         }
 
-        closeClient(true, true);
+        closeClient(true);
+        clearIO();
         Thread.interrupted();
 
         socket = new Socket(address, port);
@@ -130,10 +131,6 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
     }
 
     public synchronized void closeClient(boolean packet) {
-        closeClient(packet, false);
-    }
-
-    public synchronized void closeClient(boolean packet, boolean clearIO) {
         if (!packet) {
             try {
                 sendPacket(new DisconnectPacket());
@@ -158,6 +155,6 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
             throw new RuntimeException(e);
         }
 
-        super.close(clearIO);
+        super.close();
     }
 }

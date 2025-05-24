@@ -11,6 +11,7 @@ import net.ldoin.shinnetai.server.connection.ShinnetaiConnection;
 import net.ldoin.shinnetai.server.options.ServerOptions;
 import net.ldoin.shinnetai.statistic.server.ShinnetaiConnectionStatistic;
 import net.ldoin.shinnetai.statistic.server.ShinnetaiServerStatistic;
+import net.ldoin.shinnetai.util.IdGenerator;
 
 import javax.naming.OperationNotSupportedException;
 import java.io.IOException;
@@ -25,8 +26,8 @@ import java.util.logging.Logger;
 
 public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnable {
 
-    protected int freeConnectionId = 1;
     private final Map<Integer, C> connections;
+    private final IdGenerator connectionIdGenerator;
 
     private final PacketRegistry registry;
     private final Logger logger;
@@ -49,29 +50,18 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
     protected ShinnetaiServer(PacketRegistry registry, ServerOptions options, Logger logger) {
         ShinnetaiLog.init();
 
-        this.registry = registry;
         this.connections = new ConcurrentHashMap<>();
+        this.connectionIdGenerator = new IdGenerator();
+        this.registry = registry;
+        this.logger = logger;
         this.options = options;
         this.statistic = new ShinnetaiServerStatistic();
-        this.logger = logger;
 
         Runtime.getRuntime().addShutdownHook(Thread.ofVirtual().unstarted(() -> {
             if (running) {
                 close();
             }
         }));
-    }
-
-    protected int getFreeConnectionId() {
-        int id = freeConnectionId;
-        for (int i = id; i < Integer.MAX_VALUE; i++) {
-            if (!connections.containsKey(i)) {
-                freeConnectionId = ++i;
-                break;
-            }
-        }
-
-        return id;
     }
 
     public C getConnection(int id) {
@@ -158,7 +148,7 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
                     C connection = newConnection(clientSocket, connectionType, data);
                     try {
                         if (id == 0) {
-                            id = getFreeConnectionId();
+                            id = connectionIdGenerator.getNextId();
                         }
 
                         if (connections.containsKey(id)) {
@@ -233,7 +223,7 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
 
         workingThread = null;
         connections.clear();
-        freeConnectionId = 1;
+        connectionIdGenerator.clear();
 
         onStop();
     }
@@ -265,7 +255,7 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
         connections.remove(id);
         statistic.disconnect(id);
 
-        freeConnectionId = Math.min(id, freeConnectionId);
+        connectionIdGenerator.releaseId(id);
 
         onDisconnect(connection);
     }

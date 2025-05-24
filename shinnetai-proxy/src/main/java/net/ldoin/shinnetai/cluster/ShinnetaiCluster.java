@@ -207,11 +207,8 @@ public class ShinnetaiCluster<C extends ShinnetaiNodeConnection> extends Shinnet
 
         String group = connection.getNode().getGroup();
         List<C> groupList = nodes.get(group);
-        if (groupList != null) {
-            groupList.remove(connection);
-            if (groupList.isEmpty()) {
-                nodes.remove(group);
-            }
+        if (groupList != null && groupList.remove(connection) && groupList.isEmpty()) {
+            nodes.remove(group);
         }
 
         getLogger().info(String.format("Node[%s] disconnected: %d, %s:%d", group, connection.getConnectionId(), connection.getNode().getAddress(), connection.getNode().getPort()));
