@@ -32,7 +32,7 @@ public class ShinnetaiConnection<S extends ShinnetaiServer> extends ShinnetaiIOW
 
     @Override
     @SuppressWarnings("unchecked")
-    protected ShinnetaiConnection<S> self() {
+    public ShinnetaiConnection<S> self() {
         return this;
     }
 
