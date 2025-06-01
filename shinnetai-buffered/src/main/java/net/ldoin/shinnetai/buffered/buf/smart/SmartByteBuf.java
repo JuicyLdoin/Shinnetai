@@ -58,23 +58,25 @@ public class SmartByteBuf extends ByteBuf {
     public SmartByteBuf writeBooleanArray(boolean[] value) {
         int length = value.length;
         writeVarInt(length);
-        byte b = 0;
 
-        for (int i = 0; i < length; i++) {
-            if (i >= 7 && i % 7 == 0) {
+        byte b = 0;
+        int bitCount = 0;
+        for (boolean item : value) {
+            b |= (byte) ((item ? 1 : 0) << (bitCount++));
+            if (bitCount == 7) {
                 writeByte(b);
                 b = 0;
+                bitCount = 0;
             }
-
-            b |= (byte) ((value[i] ? 1 : 0) << i % 7);
         }
 
-        if (length % 8 != 0) {
+        if (bitCount > 0) {
             writeByte(b);
         }
 
         return this;
     }
+
 
     public SmartByteBuf writeIdsArray(int[] ids, boolean sorted) {
         int low = Integer.MAX_VALUE;
