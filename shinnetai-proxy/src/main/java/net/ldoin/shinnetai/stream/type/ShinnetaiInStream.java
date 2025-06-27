@@ -1,12 +1,12 @@
 package net.ldoin.shinnetai.stream.type;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.ReadPacket;
 import net.ldoin.shinnetai.packet.side.PacketSide;
 import net.ldoin.shinnetai.stream.ShinnetaiStream;
 import net.ldoin.shinnetai.stream.ShinnetaiStreamType;
 import net.ldoin.shinnetai.stream.options.ShinnetaiStreamOptions;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -43,6 +43,11 @@ public class ShinnetaiInStream extends ShinnetaiStream {
     }
 
     @Override
+    protected ShinnetaiStream createStreamInstance(int id, ShinnetaiIOWorker<?> worker, ShinnetaiStreamOptions options) {
+        return new ShinnetaiInStream(id, worker, options);
+    }
+
+    @Override
     public boolean canAccept(ReadPacket packet) {
         return super.canAccept(packet) && canAccept();
     }
@@ -61,7 +66,7 @@ public class ShinnetaiInStream extends ShinnetaiStream {
         while (canRun()) {
             try {
                 ReadPacket packet = queue.take();
-                attachWorker(packet.packet());
+                attachWorker(packet.wrapped().getPacket());
                 handlePacket(packet);
                 handledPackets++;
             } catch (InterruptedException e) {
@@ -75,6 +80,15 @@ public class ShinnetaiInStream extends ShinnetaiStream {
     }
 
     public boolean receive(ReadPacket packet) {
+        return receive(packet, false);
+    }
+
+    public boolean receive(ReadPacket packet, boolean force) {
+        if (force) {
+            queue.add(packet);
+            return true;
+        }
+
         if (canAccept(packet)) {
             queue.add(packet);
             return true;

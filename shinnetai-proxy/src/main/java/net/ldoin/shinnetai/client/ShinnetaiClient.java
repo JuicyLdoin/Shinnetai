@@ -1,13 +1,13 @@
 package net.ldoin.shinnetai.client;
 
 import net.ldoin.shinnetai.ConnectionType;
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.buffered.buf.smart.SmartByteBuf;
 import net.ldoin.shinnetai.client.options.ClientOptions;
 import net.ldoin.shinnetai.packet.common.DisconnectPacket;
 import net.ldoin.shinnetai.packet.registry.PacketRegistry;
 import net.ldoin.shinnetai.packet.side.PacketSide;
 import net.ldoin.shinnetai.statistic.client.ShinnetaiClientStatistic;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -44,7 +44,7 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
     }
 
     protected ShinnetaiClient(PacketRegistry registry, ClientOptions options, Socket socket, ConnectionType connectionType, Logger logger) throws IOException {
-        super(logger, registry, socket.getInputStream(), socket.getOutputStream(), new ShinnetaiClientStatistic());
+        super(logger, registry, socket.getInputStream(), socket.getOutputStream(), new ShinnetaiClientStatistic(), options);
         this.options = options;
         this.socket = socket;
         this.startData = SmartByteBuf.empty().writeVarInt(connectionType.ordinal()).writeVarInt(options.getId());

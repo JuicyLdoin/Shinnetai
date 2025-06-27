@@ -1,6 +1,5 @@
-package net.ldoin.shinnetai.packet.common.node;
+package net.ldoin.shinnetai.packet.extended.node;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
 import net.ldoin.shinnetai.cluster.node.ShinnetaiNodeClient;
@@ -8,8 +7,9 @@ import net.ldoin.shinnetai.cluster.node.registered.ShinnetaiNodeConnection;
 import net.ldoin.shinnetai.cluster.node.registered.ShinnetaiRegisteredNode;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.registry.ShinnetaiPacket;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
-@ShinnetaiPacket(id = -5)
+@ShinnetaiPacket(id = -21)
 public class NodePingPacket extends AbstractPacket<ShinnetaiIOWorker<?>, ShinnetaiNodeConnection> {
 
     private int clients;

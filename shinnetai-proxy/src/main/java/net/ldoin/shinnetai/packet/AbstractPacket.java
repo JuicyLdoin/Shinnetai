@@ -1,10 +1,10 @@
 package net.ldoin.shinnetai.packet;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
-import net.ldoin.shinnetai.ShinnetaiWorkerContext;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
 import net.ldoin.shinnetai.packet.side.PacketSide;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
+import net.ldoin.shinnetai.worker.ShinnetaiWorkerContext;
 
 public abstract class AbstractPacket<C extends ShinnetaiWorkerContext<?>, S extends ShinnetaiWorkerContext<?>> {
 
@@ -33,6 +33,10 @@ public abstract class AbstractPacket<C extends ShinnetaiWorkerContext<?>, S exte
 
     protected ShinnetaiIOWorker<?> getCurrentWorker() {
         return (ShinnetaiIOWorker<?>) (getClientWorker() != null ? getClientWorker() : getServerWorker());
+    }
+
+    public int getPacketId() {
+        return getCurrentContext().getRegistry().getId(getClass());
     }
 
     public PacketSide getHandleSide() {

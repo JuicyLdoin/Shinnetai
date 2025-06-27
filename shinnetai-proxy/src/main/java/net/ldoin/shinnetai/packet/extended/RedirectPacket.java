@@ -1,4 +1,4 @@
-package net.ldoin.shinnetai.packet.common;
+package net.ldoin.shinnetai.packet.extended;
 
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
@@ -9,7 +9,7 @@ import net.ldoin.shinnetai.packet.side.ClientSidePacket;
 import java.io.IOException;
 import java.net.Socket;
 
-@ShinnetaiPacket(id = -4)
+@ShinnetaiPacket(id = -20)
 public class RedirectPacket extends ClientSidePacket<ShinnetaiClient> {
 
     private String clusterGroup;

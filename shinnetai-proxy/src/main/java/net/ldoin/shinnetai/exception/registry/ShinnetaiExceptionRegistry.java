@@ -6,12 +6,12 @@ import net.ldoin.shinnetai.exception.ShinnetaiExceptions;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ExceptionRegistry {
+public class ShinnetaiExceptionRegistry {
 
     private static final Map<Integer, ShinnetaiException> REGISTRY = new HashMap<>();
 
     static {
-        register(ShinnetaiExceptions.values());
+        register(ShinnetaiExceptions.VALUES);
     }
 
     public static ShinnetaiException getException(int id) {

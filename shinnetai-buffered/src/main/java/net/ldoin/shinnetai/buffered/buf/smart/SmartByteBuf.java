@@ -5,9 +5,7 @@ import net.ldoin.shinnetai.buffered.BufferedSerializer;
 import net.ldoin.shinnetai.buffered.buf.ByteBuf;
 import net.ldoin.shinnetai.buffered.map.ByteMap;
 
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -56,27 +54,23 @@ public class SmartByteBuf extends ByteBuf {
     }
 
     public SmartByteBuf writeBooleanArray(boolean[] value) {
-        int length = value.length;
-        writeVarInt(length);
-
+        int bitIndex = 0;
         byte b = 0;
-        int bitCount = 0;
-        for (boolean item : value) {
-            b |= (byte) ((item ? 1 : 0) << (bitCount++));
-            if (bitCount == 7) {
-                writeByte(b);
+        for (int i = 0; i < value.length; i++) {
+            b |= (byte) ((value[i] ? 1 : 0) << bitIndex++);
+            if (bitIndex == 7) {
+                writeByte((byte) (b | ((i < value.length - 1) ? 0x80 : 0)));
+                bitIndex = 0;
                 b = 0;
-                bitCount = 0;
             }
         }
 
-        if (bitCount > 0) {
+        if (bitIndex > 0) {
             writeByte(b);
         }
 
         return this;
     }
-
 
     public SmartByteBuf writeIdsArray(int[] ids, boolean sorted) {
         int low = Integer.MAX_VALUE;
@@ -257,19 +251,25 @@ public class SmartByteBuf extends ByteBuf {
     }
 
     public boolean[] readBooleanArray() {
-        int size = readVarInt();
-        boolean[] array = new boolean[size];
-        byte b = 0;
-
-        for (int i = 0; i < size; i++) {
-            if (i % 7 == 0) {
-                b = readByte();
+        List<Boolean> boolList = new ArrayList<>();
+        while (true) {
+            byte b = readByte();
+            boolean hasNext = (b & 0x80) != 0;
+            for (int i = 0; i < 7; i++) {
+                boolList.add((b & (1 << i)) != 0);
             }
 
-            array[i] = (b & (1 << i % 7)) != 0;
+            if (!hasNext) {
+                break;
+            }
         }
 
-        return array;
+        boolean[] result = new boolean[boolList.size()];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = boolList.get(i);
+        }
+
+        return result;
     }
 
     public int[] readIdsArray() {

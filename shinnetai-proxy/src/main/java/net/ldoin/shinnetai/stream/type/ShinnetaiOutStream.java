@@ -1,13 +1,12 @@
 package net.ldoin.shinnetai.stream.type;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
-import net.ldoin.shinnetai.ShinnetaiWorkerContext;
-import net.ldoin.shinnetai.packet.AbstractPacket;
-import net.ldoin.shinnetai.packet.response.PacketResponseOptions;
+import net.ldoin.shinnetai.packet.WrappedPacket;
 import net.ldoin.shinnetai.packet.side.PacketSide;
 import net.ldoin.shinnetai.stream.ShinnetaiStream;
 import net.ldoin.shinnetai.stream.ShinnetaiStreamType;
 import net.ldoin.shinnetai.stream.options.ShinnetaiStreamOptions;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
+import net.ldoin.shinnetai.worker.ShinnetaiWorkerContext;
 
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -45,11 +44,16 @@ public class ShinnetaiOutStream extends ShinnetaiStream {
     }
 
     @Override
+    protected ShinnetaiStream createStreamInstance(int id, ShinnetaiIOWorker<?> worker, ShinnetaiStreamOptions options) {
+        return new ShinnetaiOutStream(id, worker, options);
+    }
+
+    @Override
     public void run() {
         while (canRun()) {
             try {
                 SendPair sendPair = queue.take();
-                attachWorker(sendPair.packet);
+                attachWorker(sendPair.packet.getPacket());
                 sendPair.accept(worker);
                 handledPackets++;
             } catch (InterruptedException e) {
@@ -60,21 +64,17 @@ public class ShinnetaiOutStream extends ShinnetaiStream {
         super.run();
     }
 
-    public boolean send(AbstractPacket<?, ?> packet) {
-        return send(packet, PacketResponseOptions.empty());
-    }
-
-    public boolean send(AbstractPacket<?, ?> packet, PacketResponseOptions responseOptions) {
+    public boolean send(WrappedPacket packet) {
         return send((context, packet1) -> {
             try {
-                context.sendPacket(packet1, responseOptions);
+                context.sendPacket(packet1);
             } catch (IOException e) {
                 getLogger().warning("Cannot send packet");
             }
         }, packet);
     }
 
-    public boolean send(BiConsumer<ShinnetaiWorkerContext<?>, AbstractPacket<?, ?>> consumer, AbstractPacket<?, ?> packet) {
+    public boolean send(BiConsumer<ShinnetaiWorkerContext<?>, WrappedPacket> consumer, WrappedPacket packet) {
         return enqueue(new SendPair(consumer, packet));
     }
 
@@ -88,10 +88,10 @@ public class ShinnetaiOutStream extends ShinnetaiStream {
 
     protected static class SendPair {
 
-        private final BiConsumer<ShinnetaiWorkerContext<?>, AbstractPacket<?, ?>> function;
-        private final AbstractPacket<?, ?> packet;
+        private final BiConsumer<ShinnetaiWorkerContext<?>, WrappedPacket> function;
+        private final WrappedPacket packet;
 
-        protected SendPair(BiConsumer<ShinnetaiWorkerContext<?>, AbstractPacket<?, ?>> function, AbstractPacket<?, ?> packet) {
+        protected SendPair(BiConsumer<ShinnetaiWorkerContext<?>, WrappedPacket> function, WrappedPacket packet) {
             this.function = function;
             this.packet = packet;
         }

@@ -11,7 +11,7 @@ import net.ldoin.shinnetai.cluster.options.ClusterOptions;
 import net.ldoin.shinnetai.cluster.task.ClusterPingTask;
 import net.ldoin.shinnetai.exception.ShinnetaiException;
 import net.ldoin.shinnetai.exception.ShinnetaiExceptions;
-import net.ldoin.shinnetai.packet.common.RedirectPacket;
+import net.ldoin.shinnetai.packet.extended.RedirectPacket;
 import net.ldoin.shinnetai.packet.registry.PacketRegistry;
 import net.ldoin.shinnetai.server.ShinnetaiServer;
 import net.ldoin.shinnetai.server.options.ServerOptions;
@@ -33,7 +33,7 @@ public class ShinnetaiCluster<C extends ShinnetaiNodeConnection> extends Shinnet
     private final ScheduledExecutorService executorService;
 
     public ShinnetaiCluster(ClusterOptions options) {
-        this(PacketRegistry.getCommons(), options);
+        this(PacketRegistry.getExtended(), options);
     }
 
     public ShinnetaiCluster(PacketRegistry packetRegistry, ClusterOptions options) {
@@ -156,7 +156,6 @@ public class ShinnetaiCluster<C extends ShinnetaiNodeConnection> extends Shinnet
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     protected C newConnection(Socket socket, ConnectionType connectionType, ReadOnlySmartByteBuf data) throws IOException {
         int port = socket.getPort();
         String group = "default";
@@ -176,7 +175,7 @@ public class ShinnetaiCluster<C extends ShinnetaiNodeConnection> extends Shinnet
         }
 
         ShinnetaiRegisteredNode node = new ShinnetaiRegisteredNode(socket.getInetAddress().getHostAddress(), port, group, maxConnections);
-        C connection = (C) new ShinnetaiNodeConnection(this, 0, getRegistry(), new ShinnetaiConnectionStatistic(getStatistic()), socket, node, connectionType);
+        C connection = newNodeConnection(socket, node, connectionType);
         if (connectionType == ConnectionType.NODE) {
             clusterStatistic.connectNode(node);
         } else {
@@ -184,6 +183,11 @@ public class ShinnetaiCluster<C extends ShinnetaiNodeConnection> extends Shinnet
         }
 
         return connection;
+    }
+
+    @SuppressWarnings("unchecked")
+    protected C newNodeConnection(Socket socket, ShinnetaiRegisteredNode node, ConnectionType connectionType) throws IOException {
+        return (C) new ShinnetaiNodeConnection(this, 0, getRegistry(), new ShinnetaiConnectionStatistic(getStatistic()), socket, node, connectionType, options);
     }
 
     @Override

@@ -2,6 +2,7 @@ package net.ldoin.shinnetai.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -9,7 +10,6 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-@SuppressWarnings("unused")
 public class ReflectionUtil {
 
     @SuppressWarnings("unchecked")
@@ -17,7 +17,7 @@ public class ReflectionUtil {
         List<Class<? extends T>> result = new ArrayList<>();
         List<Class<?>> allClasses = getClassesInPackage(packageName);
         for (Class<?> candidateClass : allClasses) {
-            if (clazz.isAssignableFrom(candidateClass) && !java.lang.reflect.Modifier.isAbstract(candidateClass.getModifiers())) {
+            if (clazz.isAssignableFrom(candidateClass) && !Modifier.isAbstract(candidateClass.getModifiers())) {
                 result.add((Class<? extends T>) candidateClass);
             }
         }
@@ -31,8 +31,6 @@ public class ReflectionUtil {
             String path = packageName.replace('.', '/');
             ClassLoader classLoader = ReflectionUtil.class.getClassLoader();
             Enumeration<URL> resources = classLoader.getResources(path);
-
-            int size = 0;
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
                 String file = resource.getFile().replace("file:", "").replace("\\", "/");
@@ -48,7 +46,6 @@ public class ReflectionUtil {
                         findClassesInJar(packageName, jarFile, classes);
                     }
                 }
-                size++;
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to load classes from package: " + packageName, e);

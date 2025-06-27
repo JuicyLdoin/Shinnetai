@@ -1,14 +1,14 @@
 package net.ldoin.shinnetai.packet.common;
 
-import net.ldoin.shinnetai.ShinnetaiWorkerContext;
 import net.ldoin.shinnetai.buffered.BufferedSerializer;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
 import net.ldoin.shinnetai.client.ShinnetaiClient;
 import net.ldoin.shinnetai.exception.ShinnetaiException;
-import net.ldoin.shinnetai.exception.registry.ExceptionRegistry;
+import net.ldoin.shinnetai.exception.registry.ShinnetaiExceptionRegistry;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.registry.ShinnetaiPacket;
+import net.ldoin.shinnetai.worker.ShinnetaiWorkerContext;
 
 import java.util.logging.Level;
 
@@ -24,7 +24,7 @@ public class ExceptionPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiWo
     }
 
     public ExceptionPacket(int id) {
-        this(ExceptionRegistry.getException(id));
+        this(ShinnetaiExceptionRegistry.getException(id));
     }
 
     public ExceptionPacket(ShinnetaiException exception) {
@@ -32,7 +32,7 @@ public class ExceptionPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiWo
     }
 
     public ExceptionPacket(int id, Object... objects) {
-        this(ExceptionRegistry.getException(id), objects);
+        this(ShinnetaiExceptionRegistry.getException(id), objects);
     }
 
     public ExceptionPacket(ShinnetaiException exception, Object... objects) {
@@ -42,19 +42,19 @@ public class ExceptionPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiWo
 
     @Override
     public void handleClient() {
-        getClientWorker().getLogger().log(Level.WARNING, "Received exception: " + ExceptionRegistry.getMessage(exception, objects));
+        getClientWorker().getLogger().log(Level.WARNING, "Received exception: " + ShinnetaiExceptionRegistry.getMessage(exception, objects));
         exception.handleClient(getClientWorker());
     }
 
     @Override
     public void handleServer() {
-        getServerWorker().getLogger().log(Level.WARNING, "Received exception: " + ExceptionRegistry.getMessage(exception, objects));
+        getServerWorker().getLogger().log(Level.WARNING, "Received exception: " + ShinnetaiExceptionRegistry.getMessage(exception, objects));
         exception.handleServer(getCurrentContext());
     }
 
     @Override
     public void read(ReadOnlySmartByteBuf buf) {
-        exception = ExceptionRegistry.getException(buf.readVarInt());
+        exception = ShinnetaiExceptionRegistry.getException(buf.readVarInt());
 
         if (!buf.readBoolean()) {
             objects = EMPTY_ARGUMENTS;

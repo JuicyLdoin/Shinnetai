@@ -1,11 +1,11 @@
-package net.ldoin.shinnetai.packet.common.stream;
+package net.ldoin.shinnetai.packet.extended.stream;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
 import net.ldoin.shinnetai.client.ShinnetaiClient;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.registry.ShinnetaiPacket;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 @ShinnetaiPacket(id = -51)
 public class StreamClosePacket extends AbstractPacket<ShinnetaiClient, ShinnetaiIOWorker<?>> {

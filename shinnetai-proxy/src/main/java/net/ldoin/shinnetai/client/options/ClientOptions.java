@@ -1,19 +1,21 @@
 package net.ldoin.shinnetai.client.options;
 
+import net.ldoin.shinnetai.worker.options.WorkerOptions;
+
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-public class ClientOptions {
+public class ClientOptions extends WorkerOptions {
 
     public static ClientOptions of(String address, int port) {
-        return new Builder(address, port).build();
+        return new Builder<>(address, port).build();
     }
 
-    public static Builder builder(String address, int port) {
-        return new Builder(address, port);
+    public static Builder<?> builder(String address, int port) {
+        return new Builder<>(address, port);
     }
 
     private final String address;
@@ -23,7 +25,8 @@ public class ClientOptions {
     private final Set<String> clusterGroups;
     private final boolean redirecting;
 
-    private ClientOptions(Builder builder) {
+    protected ClientOptions(Builder<?> builder) {
+        super(builder);
         this.address = builder.address;
         this.port = builder.port;
         this.id = builder.id;
@@ -60,7 +63,7 @@ public class ClientOptions {
         return new Socket(address, port);
     }
 
-    public static class Builder {
+    public static class Builder<B extends Builder<?>> extends WorkerOptions.Builder<B> {
 
         private final String address;
         private final int port;
@@ -79,29 +82,34 @@ public class ClientOptions {
             this.redirecting = true;
         }
 
-        public Builder setId(int id) {
+        public B setId(int id) {
             this.id = id;
-            return this;
+            return self();
         }
 
-        public Builder setClustering(boolean clustering) {
+        public B setClustering(boolean clustering) {
             this.clustering = clustering;
-            return this;
+            return self();
         }
 
-        public Builder addClusterGroup(String clusterGroup) {
+        public B addClusterGroup(String clusterGroup) {
             this.clusterGroups.add(clusterGroup);
-            return this;
+            return self();
         }
 
-        public Builder clearClusterGroups() {
+        public B clearClusterGroups() {
             this.clusterGroups.clear();
-            return this;
+            return self();
         }
 
-        public Builder setRedirecting(boolean redirecting) {
+        public B setRedirecting(boolean redirecting) {
             this.redirecting = redirecting;
-            return this;
+            return self();
+        }
+
+        @SuppressWarnings("unchecked")
+        protected B self() {
+            return (B) this;
         }
 
         public ClientOptions build() {

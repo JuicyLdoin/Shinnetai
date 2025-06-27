@@ -1,8 +1,8 @@
 package net.ldoin.shinnetai.exception;
 
-import net.ldoin.shinnetai.ShinnetaiWorkerContext;
 import net.ldoin.shinnetai.client.ShinnetaiClient;
 import net.ldoin.shinnetai.packet.common.ExceptionPacket;
+import net.ldoin.shinnetai.worker.ShinnetaiWorkerContext;
 
 public interface ShinnetaiException {
 
