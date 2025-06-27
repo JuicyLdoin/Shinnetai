@@ -1,7 +1,7 @@
 package net.ldoin.shinnetai.packet.side;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.packet.AbstractPacket;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 public abstract class ClientSidePacket<C extends ShinnetaiIOWorker<?>> extends AbstractPacket<C, ShinnetaiIOWorker<?>> {
 

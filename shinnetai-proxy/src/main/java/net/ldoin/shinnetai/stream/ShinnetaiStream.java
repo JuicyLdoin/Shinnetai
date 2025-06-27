@@ -1,13 +1,15 @@
 package net.ldoin.shinnetai.stream;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
-import net.ldoin.shinnetai.ShinnetaiWorkerContext;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.ReadPacket;
+import net.ldoin.shinnetai.packet.WrappedPacket;
 import net.ldoin.shinnetai.statistic.ShinnetaiStatistic;
 import net.ldoin.shinnetai.stream.options.ShinnetaiStreamOptions;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
+import net.ldoin.shinnetai.worker.ShinnetaiWorkerContext;
+import net.ldoin.shinnetai.worker.pipeline.ShinnetaiPipeline;
 
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiStatistic> implements Runnable {
@@ -19,8 +21,10 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
     protected Thread thread;
     private Thread lifetimeThread;
     private long startedAt;
-    protected volatile boolean running;
+    private final AtomicBoolean running;
     protected int handledPackets;
+
+    protected volatile ShinnetaiPipeline pipeline;
 
     protected ShinnetaiStream(ShinnetaiIOWorker<?> worker, ShinnetaiStreamOptions options) {
         this(worker.getStreamIdGenerator().getNextId(), worker, options);
@@ -32,11 +36,35 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
         this.id = id;
         this.worker = worker;
         this.options = options;
+        this.running = new AtomicBoolean();
+        this.pipeline = worker.getPipeline();
+    }
+
+    @Override
+    public ShinnetaiPipeline getPipeline() {
+        return pipeline;
+    }
+
+    @Override
+    public void withPipeline(ShinnetaiPipeline pipeline) {
+        this.pipeline = pipeline;
     }
 
     public int getId() {
         return id;
     }
+
+    public ShinnetaiStream withId(int id) {
+        return newInstance(id, worker, options);
+    }
+
+    private ShinnetaiStream newInstance(int id, ShinnetaiIOWorker<?> worker, ShinnetaiStreamOptions options) {
+        ShinnetaiStream stream = createStreamInstance(id, worker, options);
+        stream.logger = Logger.getLogger("Stream (" + id + ")");
+        return stream;
+    }
+
+    protected abstract ShinnetaiStream createStreamInstance(int id, ShinnetaiIOWorker<?> worker, ShinnetaiStreamOptions options);
 
     public abstract IShinnetaiStreamType getType();
 
@@ -49,11 +77,15 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
     }
 
     public boolean isRunning() {
-        return running;
+        return running.get();
     }
 
     public boolean canAccept(ReadPacket packet) {
         return options.getPacketsFilter().contains(packet.id());
+    }
+
+    public boolean canAccept(WrappedPacket packet) {
+        return canAccept(packet.getPacket());
     }
 
     public boolean canAccept(AbstractPacket<?, ?> packet) {
@@ -61,7 +93,7 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
     }
 
     public boolean canRun() {
-        return running && (options.getPacketsAmount() == -1 || handledPackets < options.getPacketsAmount());
+        return isRunning() && (options.getPacketsAmount() == -1 || handledPackets < options.getPacketsAmount());
     }
 
     @Override
@@ -77,6 +109,10 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
     }
 
     public synchronized void open(boolean fromWorker) {
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
+
         if (worker == null) {
             throw new UnsupportedOperationException("Cannot open stream without IO worker");
         }
@@ -88,7 +124,6 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
         }
 
         startedAt = System.currentTimeMillis();
-        running = true;
         thread = Thread.ofVirtual().start(() -> {
             try {
                 run();
@@ -101,7 +136,7 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
             lifetimeThread = Thread.ofVirtual().start(() -> {
                 try {
                     Thread.sleep(options.getLifetime());
-                    if (running) {
+                    if (isRunning()) {
                         getLogger().warning("Stream exceeded lifetime, closing...");
                         close();
                     }
@@ -116,7 +151,10 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
     }
 
     public synchronized void close() {
-        running = false;
+        if (!running.compareAndSet(true, false)) {
+            return;
+        }
+
         if (thread == null) {
             return;
         }
@@ -127,7 +165,7 @@ public abstract class ShinnetaiStream extends ShinnetaiWorkerContext<ShinnetaiSt
         stopLifetimeThread();
         worker.closeStream(this);
 
-        getLogger().info(String.format("Stream closed with work time %dms", System.currentTimeMillis() - startedAt));
+        getLogger().info(String.format("Stream closed with work time %dms, handled packets - %d", System.currentTimeMillis() - startedAt, handledPackets));
     }
 
     private synchronized void stopLifetimeThread() {

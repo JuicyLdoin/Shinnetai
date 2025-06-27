@@ -1,8 +1,8 @@
 package net.ldoin.shinnetai.stream.options;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.registry.PacketRegistry;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -82,7 +82,7 @@ public class ShinnetaiStreamOptions {
 
         public Builder addPacket(Class<? extends AbstractPacket<?, ?>> packet) {
             if (registry == null) {
-                throw new UnsupportedOperationException("Registry not fount");
+                throw new UnsupportedOperationException("Registry not found");
             }
 
             this.packetsFilter.add(registry.getId(packet));

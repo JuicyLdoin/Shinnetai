@@ -2,9 +2,10 @@ package net.ldoin.shinnetai.log;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.logging.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
 
 public class ShinnetaiLogFormatter extends Formatter {
 

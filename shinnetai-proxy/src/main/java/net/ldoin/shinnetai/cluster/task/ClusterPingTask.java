@@ -3,7 +3,7 @@ package net.ldoin.shinnetai.cluster.task;
 import net.ldoin.shinnetai.ConnectionType;
 import net.ldoin.shinnetai.cluster.ShinnetaiCluster;
 import net.ldoin.shinnetai.cluster.node.registered.ShinnetaiNodeConnection;
-import net.ldoin.shinnetai.packet.common.node.NodePingPacket;
+import net.ldoin.shinnetai.packet.extended.node.NodePingPacket;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -38,6 +38,7 @@ public class ClusterPingTask<C extends ShinnetaiNodeConnection> implements Runna
                 } else if (System.currentTimeMillis() - node.getNode().getLastPing() >= cluster.getOptions().getServerTimeout()) {
                     node.close();
                     cluster.disconnect(node);
+                    pinging.remove(node);
                 }
             }
         } catch (Exception exception) {

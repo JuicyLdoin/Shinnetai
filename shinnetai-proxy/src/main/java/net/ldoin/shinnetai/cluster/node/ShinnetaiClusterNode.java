@@ -16,7 +16,7 @@ public class ShinnetaiClusterNode<C extends ShinnetaiNodeConnection> extends Shi
     private final ShinnetaiNodeClient clusterClient;
 
     public ShinnetaiClusterNode(ServerOptions options, ClusterNodeOptions clientOptions) throws IOException {
-        this(PacketRegistry.getCommons(), options, clientOptions);
+        this(PacketRegistry.getExtended(), options, clientOptions);
     }
 
     public ShinnetaiClusterNode(PacketRegistry registry, ServerOptions options, ClusterNodeOptions clientOptions) throws IOException {

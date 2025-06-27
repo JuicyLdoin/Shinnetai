@@ -53,4 +53,9 @@ public class PacketResponseOptions {
         buf.writeVarInt(waitResponse);
         buf.writeVarInt(response);
     }
+
+    @Override
+    public String toString() {
+        return "PacketResponseOptions{waitResponse=" + waitResponse + ", response=" + response + '}';
+    }
 }

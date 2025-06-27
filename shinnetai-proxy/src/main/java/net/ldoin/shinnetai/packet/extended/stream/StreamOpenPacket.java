@@ -1,13 +1,12 @@
-package net.ldoin.shinnetai.packet.common.stream;
+package net.ldoin.shinnetai.packet.extended.stream;
 
-import net.ldoin.shinnetai.ShinnetaiIOWorker;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.buffered.buf.smart.WriteOnlySmartByteBuf;
 import net.ldoin.shinnetai.client.ShinnetaiClient;
 import net.ldoin.shinnetai.packet.AbstractPacket;
 import net.ldoin.shinnetai.packet.registry.ShinnetaiPacket;
 import net.ldoin.shinnetai.stream.options.ShinnetaiStreamOptions;
-import net.ldoin.shinnetai.stream.type.ShinnetaiInStream;
+import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -15,6 +14,7 @@ import java.util.Set;
 @ShinnetaiPacket(id = -50)
 public class StreamOpenPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiIOWorker<?>> {
 
+    private int typeId;
     private int id;
     private ShinnetaiStreamOptions options;
 
@@ -25,9 +25,26 @@ public class StreamOpenPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiI
         this(id, null);
     }
 
+    public StreamOpenPacket(ShinnetaiStreamOptions options) {
+        this(1, -1, options);
+    }
+
     public StreamOpenPacket(int id, ShinnetaiStreamOptions options) {
+        this(1, id, options);
+    }
+
+    public StreamOpenPacket(int typeId, int id) {
+        this(typeId, id, null);
+    }
+
+    public StreamOpenPacket(int typeId, int id, ShinnetaiStreamOptions options) {
+        this.typeId = typeId;
         this.id = id;
         this.options = options;
+    }
+
+    public int getTypeId() {
+        return typeId;
     }
 
     public int getId() {
@@ -46,7 +63,8 @@ public class StreamOpenPacket extends AbstractPacket<ShinnetaiClient, ShinnetaiI
 
     private void handle() {
         ShinnetaiIOWorker<?> worker = getCurrentWorker();
-        worker.openStream(new ShinnetaiInStream(id, worker, options));
+        worker.getLogger().info("Packet open stream");
+        id = worker.openStream(typeId, id, options);
     }
 
     @Override

@@ -1,42 +1,44 @@
 package net.ldoin.shinnetai.packet.response;
 
 import net.ldoin.shinnetai.packet.AbstractPacket;
+import net.ldoin.shinnetai.util.IdGenerator;
 
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class PacketResponseWaiter {
 
-    private final ConcurrentHashMap<Integer, Optional<AbstractPacket<?, ?>>> syncWaiters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, SyncWaiter> syncWaiters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, CompletableFuture<Optional<AbstractPacket<?, ?>>>> asyncWaiters = new ConcurrentHashMap<>();
-    private final PriorityQueue<Integer> availableIds = new PriorityQueue<>();
-    private final AtomicInteger nextIdGenerator = new AtomicInteger(1);
-    private final ConcurrentHashMap<Integer, Lock> waiterLocks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Integer, Condition> waiterConditions = new ConcurrentHashMap<>();
+    private final IdGenerator idGenerator = new IdGenerator();
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    private final ScheduledExecutorService scheduler;
+
+    public PacketResponseWaiter() {
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, runnable -> {
+            Thread t = new Thread(runnable);
+            t.setDaemon(true);
+            t.setName("shinnetai-timeout-scheduler");
+            return t;
+        });
+
+        scheduler.setKeepAliveTime(10, TimeUnit.SECONDS);
+        scheduler.allowCoreThreadTimeOut(true);
+        this.scheduler = scheduler;
+    }
 
     public int waitersCount() {
         return syncWaiters.size() + asyncWaiters.size();
     }
 
-    public int addWaiter(boolean isAsync, CompletableFuture<Optional<AbstractPacket<?, ?>>> asyncHandler, long timeoutMillis) throws ArrayIndexOutOfBoundsException {
-        int waiterId = getNextWaiterId();
-        Lock lock = new ReentrantLock();
-        Condition condition = lock.newCondition();
-
-        waiterLocks.put(waiterId, lock);
-        waiterConditions.put(waiterId, condition);
+    public int addWaiter(boolean isAsync, CompletableFuture<Optional<AbstractPacket<?, ?>>> asyncHandler, long timeoutMillis) {
+        int waiterId = idGenerator.getNextId();
         if (isAsync) {
             asyncWaiters.put(waiterId, asyncHandler);
             scheduleAsyncTimeout(waiterId, timeoutMillis);
         } else {
-            syncWaiters.put(waiterId, Optional.empty());
+            syncWaiters.put(waiterId, new SyncWaiter());
             scheduleTimeout(waiterId, timeoutMillis);
         }
 
@@ -44,120 +46,69 @@ public class PacketResponseWaiter {
     }
 
     public AbstractPacket<?, ?> waitForResponse(int waiterId, long timeoutMillis) throws TimeoutException, InterruptedException {
-        Lock lock = waiterLocks.get(waiterId);
-        Condition condition = waiterConditions.get(waiterId);
-        if (lock == null || condition == null) {
-            throw new IllegalStateException("No lock or condition found for waiter ID: " + waiterId);
+        SyncWaiter waiter = syncWaiters.get(waiterId);
+        if (waiter == null) {
+            throw new TimeoutException("No waiter found for ID: " + waiterId);
         }
 
-        long startTime = System.currentTimeMillis();
-        lock.lock();
-        try {
-            while (syncWaiters.containsKey(waiterId)) {
-                if (syncWaiters.get(waiterId).isPresent()) {
-                    break;
-                }
+        boolean completed = waiter.latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
+        syncWaiters.remove(waiterId);
 
-                long elapsedTime = System.currentTimeMillis() - startTime;
-                if (elapsedTime >= timeoutMillis) {
-                    syncWaiters.remove(waiterId);
-                    cleanupWaiter(waiterId);
-                    throw new TimeoutException("Response timed out for waiter ID: " + waiterId);
-                }
-
-                condition.await(timeoutMillis - elapsedTime, TimeUnit.MILLISECONDS);
-            }
-
-            if (!syncWaiters.containsKey(waiterId)) {
-                throw new TimeoutException("Response not received for waiter ID: " + waiterId);
-            }
-
-            return syncWaiters.remove(waiterId).orElseThrow(() -> new TimeoutException("Response not received for waiter ID: " + waiterId));
-        } finally {
-            lock.unlock();
-            cleanupWaiter(waiterId);
+        if (!completed) {
+            idGenerator.releaseId(waiterId);
+            throw new TimeoutException("Timed out waiting for response");
         }
+
+        AbstractPacket<?, ?> response = waiter.packetRef.get();
+        if (response == null) {
+            throw new TimeoutException("No response received");
+        }
+
+        return response;
     }
 
     public void handleResponse(int waiterId, AbstractPacket<?, ?> response) {
-        Lock lock = waiterLocks.get(waiterId);
-        Condition condition = waiterConditions.get(waiterId);
-        if (lock == null || condition == null) {
+        SyncWaiter syncWaiter = syncWaiters.remove(waiterId);
+        if (syncWaiter != null) {
+            syncWaiter.packetRef.set(response);
+            syncWaiter.latch.countDown();
+            idGenerator.releaseId(waiterId);
             return;
         }
 
-        lock.lock();
-        try {
-            if (syncWaiters.containsKey(waiterId)) {
-                syncWaiters.put(waiterId, Optional.of(response));
-                condition.signalAll();
-            } else if (asyncWaiters.containsKey(waiterId)) {
-                asyncWaiters.get(waiterId).complete(Optional.ofNullable(response));
-                asyncWaiters.remove(waiterId);
-                cleanupWaiter(waiterId);
-            }
-        } finally {
-            lock.unlock();
+        CompletableFuture<Optional<AbstractPacket<?, ?>>> asyncFuture = asyncWaiters.remove(waiterId);
+        if (asyncFuture != null) {
+            asyncFuture.complete(Optional.ofNullable(response));
+            idGenerator.releaseId(waiterId);
         }
-    }
-
-    private void cleanupWaiter(int waiterId) {
-        waiterLocks.remove(waiterId);
-        waiterConditions.remove(waiterId);
-        releaseWaiterId(waiterId);
     }
 
     private void scheduleTimeout(int waiterId, long timeoutMillis) {
         scheduler.schedule(() -> {
-            Lock lock = waiterLocks.get(waiterId);
-            Condition condition = waiterConditions.get(waiterId);
-            if (lock == null || condition == null) {
-                return;
-            }
-
-            lock.lock();
-            try {
-                if (syncWaiters.containsKey(waiterId) && syncWaiters.get(waiterId).isEmpty()) {
-                    syncWaiters.remove(waiterId);
-                    releaseWaiterId(waiterId);
-                    condition.signalAll();
-                }
-            } finally {
-                lock.unlock();
+            SyncWaiter waiter = syncWaiters.remove(waiterId);
+            if (waiter != null) {
+                waiter.latch.countDown();
+                idGenerator.releaseId(waiterId);
             }
         }, timeoutMillis, TimeUnit.MILLISECONDS);
     }
 
     private void scheduleAsyncTimeout(int waiterId, long timeoutMillis) {
         scheduler.schedule(() -> {
-            if (asyncWaiters.containsKey(waiterId)) {
-                CompletableFuture<Optional<AbstractPacket<?, ?>>> handler = asyncWaiters.remove(waiterId);
-                if (handler != null) {
-                    handler.completeExceptionally(new TimeoutException("Response not received for waiter ID: " + waiterId));
-                }
-
-                cleanupWaiter(waiterId);
+            CompletableFuture<Optional<AbstractPacket<?, ?>>> asyncFuture = asyncWaiters.remove(waiterId);
+            if (asyncFuture != null) {
+                asyncFuture.completeExceptionally(new TimeoutException("Response not received"));
+                idGenerator.releaseId(waiterId);
             }
         }, timeoutMillis, TimeUnit.MILLISECONDS);
     }
 
-    private int getNextWaiterId() throws ArrayIndexOutOfBoundsException {
-        synchronized (this) {
-            if (availableIds.isEmpty()) {
-                return nextIdGenerator.getAndIncrement();
-            } else {
-                return availableIds.poll();
-            }
-        }
-    }
-
-    private void releaseWaiterId(int waiterId) {
-        synchronized (this) {
-            availableIds.offer(waiterId);
-        }
-    }
-
     public void shutdown() {
         scheduler.shutdown();
+    }
+
+    private static class SyncWaiter {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicReference<AbstractPacket<?, ?>> packetRef = new AtomicReference<>();
     }
 }

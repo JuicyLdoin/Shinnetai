@@ -5,7 +5,7 @@ import net.ldoin.shinnetai.client.ShinnetaiClient;
 import net.ldoin.shinnetai.client.options.ClientOptions;
 import net.ldoin.shinnetai.cluster.node.options.ClusterNodeOptions;
 import net.ldoin.shinnetai.exception.ShinnetaiExceptions;
-import net.ldoin.shinnetai.packet.common.RedirectPacket;
+import net.ldoin.shinnetai.packet.extended.RedirectPacket;
 import net.ldoin.shinnetai.packet.registry.PacketRegistry;
 import net.ldoin.shinnetai.server.connection.ShinnetaiConnection;
 
@@ -19,7 +19,7 @@ public class ShinnetaiNodeClient extends ShinnetaiClient {
     private final ShinnetaiClusterNode<?> node;
 
     public ShinnetaiNodeClient(ClusterNodeOptions options, ShinnetaiClusterNode<?> node) throws IOException {
-        this(PacketRegistry.getCommons(), options, node);
+        this(PacketRegistry.getExtended(), options, node);
     }
 
     public ShinnetaiNodeClient(PacketRegistry registry, ClusterNodeOptions options, ShinnetaiClusterNode<?> node) throws IOException {

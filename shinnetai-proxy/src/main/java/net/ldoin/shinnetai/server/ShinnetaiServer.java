@@ -4,7 +4,7 @@ import net.ldoin.shinnetai.ConnectionType;
 import net.ldoin.shinnetai.buffered.buf.smart.ReadOnlySmartByteBuf;
 import net.ldoin.shinnetai.exception.ShinnetaiExceptions;
 import net.ldoin.shinnetai.log.ShinnetaiLog;
-import net.ldoin.shinnetai.packet.AbstractPacket;
+import net.ldoin.shinnetai.packet.WrappedPacket;
 import net.ldoin.shinnetai.packet.common.ServerDisablePacket;
 import net.ldoin.shinnetai.packet.registry.PacketRegistry;
 import net.ldoin.shinnetai.server.connection.ShinnetaiConnection;
@@ -19,7 +19,9 @@ import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -72,7 +74,7 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
         return Collections.unmodifiableCollection(connections.values());
     }
 
-    public void sendPacketToAll(AbstractPacket<?, ?> packet) throws IOException {
+    public void sendPacketToAll(WrappedPacket packet) throws IOException {
         for (C connection : connections.values()) {
             connection.sendPacket(packet);
         }
@@ -112,7 +114,9 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
             close();
         }
 
-        workingThread = Thread.ofVirtual().start(this);
+        workingThread = new Thread(this);
+        workingThread.start();
+
         running = true;
         onStart();
     }
@@ -243,7 +247,7 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
 
     @SuppressWarnings("unchecked")
     protected C newConnection(Socket socket, ConnectionType connectionType, ReadOnlySmartByteBuf data) throws IOException {
-        return (C) new ShinnetaiConnection<>(this, 0, registry, new ShinnetaiConnectionStatistic(statistic), socket);
+        return (C) new ShinnetaiConnection<>(this, 0, registry, new ShinnetaiConnectionStatistic(statistic), socket, options);
     }
 
     public void connect(C connection) {

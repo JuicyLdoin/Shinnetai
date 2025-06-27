@@ -1,42 +1,110 @@
 package net.ldoin.shinnetai.util;
 
-import java.util.HashSet;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLongArray;
 
 public class IdGenerator {
 
-    private int nextId = 0;
-    private final PriorityQueue<Integer> freeIds = new PriorityQueue<>();
-    private final Set<Integer> allocated = new HashSet<>();
+    private static final int INITIAL_CAPACITY = 16;
 
-    public synchronized int getNextId() {
-        int id;
-        if (!freeIds.isEmpty()) {
-            id = freeIds.poll();
-        } else {
-            id = nextId++;
+    private final ConcurrentLinkedQueue<Integer> freeIds = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger nextId;
+
+    private volatile AtomicLongArray bitmap;
+
+    public IdGenerator() {
+        this(1);
+    }
+
+    public IdGenerator(int start) {
+        nextId = new AtomicInteger(start);
+        bitmap = new AtomicLongArray(INITIAL_CAPACITY);
+    }
+
+    public int getNextId() {
+        Integer id = freeIds.poll();
+        if (id == null) {
+            id = nextId.getAndIncrement();
         }
 
-        allocated.add(id);
+        ensureCapacity(id);
+        if (!markAllocated(id)) {
+            throw new IllegalStateException("ID " + id + " is already allocated (race or bug).");
+        }
+
         return id;
     }
 
-    public synchronized void releaseId(int id) {
-        if (allocated.remove(id)) {
-            freeIds.add(id);
-        } else {
-            throw new IllegalArgumentException("ID " + id + " is not allocated or already released.");
+    public void releaseId(int id) {
+        ensureCapacity(id);
+        if (!unmarkAllocated(id)) {
+            return;
+        }
+
+        freeIds.offer(id);
+    }
+
+    public void clear() {
+        bitmap = new AtomicLongArray(INITIAL_CAPACITY);
+        freeIds.clear();
+        nextId.set(0);
+    }
+
+    private boolean markAllocated(int id) {
+        int word = id >>> 6;
+        long mask = 1L << (id & 63);
+        while (true) {
+            long current = bitmap.get(word);
+            if ((current & mask) != 0) {
+                return false;
+            }
+
+            if (bitmap.compareAndSet(word, current, current | mask)) {
+                return true;
+            }
         }
     }
 
-    public synchronized boolean isAllocated(int id) {
-        return allocated.contains(id);
+    private boolean unmarkAllocated(int id) {
+        int word = id >>> 6;
+        long mask = 1L << (id & 63);
+        while (true) {
+            long current = bitmap.get(word);
+            if ((current & mask) == 0) {
+                return false;
+            }
+
+            if (bitmap.compareAndSet(word, current, current & ~mask)) {
+                return true;
+            }
+        }
     }
 
-    public synchronized void clear() {
-        allocated.clear();
-        freeIds.clear();
-        nextId = 0;
+    private void ensureCapacity(int id) {
+        int requiredWordIndex = id >>> 6;
+        AtomicLongArray current = bitmap;
+        if (requiredWordIndex < current.length()) {
+            return;
+        }
+
+        synchronized (this) {
+            current = bitmap;
+            if (requiredWordIndex < current.length()) {
+                return;
+            }
+
+            int newSize = current.length();
+            while (newSize <= requiredWordIndex) {
+                newSize <<= 1;
+            }
+
+            AtomicLongArray newBitmap = new AtomicLongArray(newSize);
+            for (int i = 0; i < current.length(); i++) {
+                newBitmap.set(i, current.get(i));
+            }
+
+            bitmap = newBitmap;
+        }
     }
 }

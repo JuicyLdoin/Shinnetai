@@ -1,19 +1,22 @@
 package net.ldoin.shinnetai.server.options;
 
-public class ServerOptions {
+import net.ldoin.shinnetai.worker.options.WorkerOptions;
+
+public class ServerOptions extends WorkerOptions {
 
     public static ServerOptions of(int port) {
-        return new Builder(port).build();
+        return new Builder<>(port).build();
     }
 
-    public static Builder builder(int port) {
-        return new Builder(port);
+    public static Builder<?> builder(int port) {
+        return new Builder<>(port);
     }
 
     private final int port;
     private final int maxConnections;
 
-    private ServerOptions(Builder builder) {
+    protected ServerOptions(Builder<?> builder) {
+        super(builder);
         this.port = builder.port;
         this.maxConnections = builder.maxConnections;
     }
@@ -26,7 +29,7 @@ public class ServerOptions {
         return maxConnections;
     }
 
-    public static class Builder {
+    public static class Builder<B extends Builder<?>> extends WorkerOptions.Builder<B> {
 
         private final int port;
         private int maxConnections = 0;
@@ -35,13 +38,19 @@ public class ServerOptions {
             this.port = port;
         }
 
-        public Builder setMaxConnections(int maxConnections) {
+        public B setMaxConnections(int maxConnections) {
             if (maxConnections < 0) {
                 throw new UnsupportedOperationException("Connection limit cannot be set below 0 (unlimited)");
             }
 
             this.maxConnections = maxConnections;
-            return this;
+            return self();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        protected B self() {
+            return (B) this;
         }
 
         public ServerOptions build() {
