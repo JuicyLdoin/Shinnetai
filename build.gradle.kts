@@ -4,19 +4,13 @@ plugins {
 }
 
 group = "net.ldoin"
-version = "1.5.3"
+version = "1.5.4"
 
 repositories {
     mavenCentral()
 }
 
-val publishModules = listOf(
-    "shinnetai-buffered",
-    "shinnetai-proxy"
-)
-
 val monoVersion = true
-
 subprojects {
     group = "net.ldoin"
     if (monoVersion) {
