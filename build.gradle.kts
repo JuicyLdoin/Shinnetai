@@ -4,22 +4,39 @@ plugins {
 }
 
 group = "net.ldoin"
-version = "1.5.4"
+version = "1.5.5"
 
 repositories {
     mavenCentral()
 }
 
 val monoVersion = true
+
 subprojects {
     group = "net.ldoin"
     if (monoVersion) {
         version = parent!!.version
     }
 
-    apply("plugin" to "java")
+    apply(plugin = "java")
+    apply(plugin = "maven-publish")
 
     repositories {
         mavenCentral()
+    }
+
+    publishing {
+        publications {
+            create<MavenPublication>("mavenJava") {
+                from(components["java"])
+                groupId = project.group.toString()
+                artifactId = project.name
+                version = project.version.toString()
+            }
+        }
+
+        repositories {
+            mavenLocal()
+        }
     }
 }
