@@ -100,7 +100,7 @@ public final class WriteOnlySmartByteBuf extends SmartByteBuf {
     }
 
     @Override
-    public <V> Collection<V> readCollection(Collection<V> collection, Function<SmartByteBuf, V> reader) {
+    public <V, C extends Collection<V>> C readCollection(C collection, Function<SmartByteBuf, V> reader) {
         throw new UnsupportedOperationException("Only write ByteBuf");
     }
 

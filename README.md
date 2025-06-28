@@ -17,8 +17,8 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.JuicyLdoin.Shinnetai:shinnetai-buffered:1.6.0'
-    implementation 'com.github.JuicyLdoin.Shinnetai:shinnetai-proxy:1.6.0'
+    implementation 'com.github.JuicyLdoin.Shinnetai:shinnetai-buffered:1.6.1'
+    implementation 'com.github.JuicyLdoin.Shinnetai:shinnetai-proxy:1.6.1'
 }
 ```
 
@@ -39,12 +39,12 @@ Add the following to your `pom.xml`:
 <dependency>
     <groupId>com.github.JuicyLdoin.Shinnetai</groupId>
     <artifactId>shinnetai-buffered</artifactId>
-    <version>1.6.0</version>
+    <version>1.6.1</version>
 </dependency>
 <dependency>
     <groupId>com.github.JuicyLdoin.Shinnetai</groupId>
     <artifactId>shinnetai-proxy</artifactId>
-    <version>1.6.0</version>
+    <version>1.6.1</version>
 </dependency>
 </dependencies>
 ```

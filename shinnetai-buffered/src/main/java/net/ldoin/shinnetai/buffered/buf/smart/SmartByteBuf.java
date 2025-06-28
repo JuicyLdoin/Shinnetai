@@ -342,11 +342,10 @@ public class SmartByteBuf extends ByteBuf {
         return str.toString();
     }
 
-    public <V> Collection<V> readCollection(Collection<V> collection, Function<SmartByteBuf, V> reader) {
+    public <V, C extends Collection<V>> C readCollection(C collection, Function<SmartByteBuf, V> reader) {
         for (int i = 0; i < readVarInt(); i++) {
             collection.add(reader.apply(this));
         }
-
         return collection;
     }
 
