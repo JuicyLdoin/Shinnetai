@@ -14,6 +14,8 @@ import net.ldoin.shinnetai.statistic.server.ShinnetaiServerStatistic;
 import net.ldoin.shinnetai.util.IdGenerator;
 
 import javax.naming.OperationNotSupportedException;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
@@ -124,10 +126,20 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
     @Override
     public void run() {
         try {
-            serverSocket = new ServerSocket(options.getPort());
+            serverSocket = options.toSocket();
             while (running) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    if (clientSocket instanceof SSLSocket sslSocket) {
+                        try {
+                            sslSocket.startHandshake();
+                        } catch (SSLHandshakeException e) {
+                            logger.log(Level.WARNING, "SSL handshake failed: " + e.getMessage());
+                            sslSocket.close();
+                            continue;
+                        }
+                    }
+
                     InputStream input = clientSocket.getInputStream();
 
                     int id;

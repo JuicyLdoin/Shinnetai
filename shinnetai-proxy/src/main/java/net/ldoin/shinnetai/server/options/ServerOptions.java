@@ -1,6 +1,10 @@
 package net.ldoin.shinnetai.server.options;
 
+import net.ldoin.shinnetai.util.SSLUtil;
 import net.ldoin.shinnetai.worker.options.WorkerOptions;
+
+import java.io.IOException;
+import java.net.ServerSocket;
 
 public class ServerOptions extends WorkerOptions {
 
@@ -27,6 +31,29 @@ public class ServerOptions extends WorkerOptions {
 
     public int getMaxConnections() {
         return maxConnections;
+    }
+
+    public ServerSocket toSocket() throws IOException {
+        ServerSocket socket;
+        if (isSSL()) {
+            try {
+                if (getSSLKeystore() != null) {
+                    socket = SSLUtil.createServerSocketFactory(
+                            getSSLKeystore(),
+                            getSSLKeystorePassword(),
+                            getSSLKeyPassword()
+                    ).createServerSocket(port);
+                } else {
+                    socket = SSLUtil.getDefaultServerSocketFactory().createServerSocket(port);
+                }
+            } catch (Exception e) {
+                throw new IOException("Failed to create SSL server socket", e);
+            }
+        } else {
+            socket = new ServerSocket(port);
+        }
+
+        return socket;
     }
 
     public static class Builder<B extends Builder<?>> extends WorkerOptions.Builder<B> {
