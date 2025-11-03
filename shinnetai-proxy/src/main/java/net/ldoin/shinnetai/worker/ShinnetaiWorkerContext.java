@@ -102,6 +102,11 @@ public abstract class ShinnetaiWorkerContext<S extends ShinnetaiStatistic> {
     }
 
     public void sendPacket(WrappedPacket packet) throws IOException {
+        if (out == null) {
+            logger.log(Level.SEVERE, "OutputStream not found", new NullPointerException());
+            return;
+        }
+
         if (packet == null) {
             return;
         }

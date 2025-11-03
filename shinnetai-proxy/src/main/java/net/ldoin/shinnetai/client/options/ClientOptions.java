@@ -1,5 +1,6 @@
 package net.ldoin.shinnetai.client.options;
 
+import net.ldoin.shinnetai.util.SSLUtil;
 import net.ldoin.shinnetai.worker.options.WorkerOptions;
 
 import java.io.IOException;
@@ -60,7 +61,26 @@ public class ClientOptions extends WorkerOptions {
     }
 
     public Socket toSocket() throws IOException {
-        return new Socket(address, port);
+        Socket socket;
+        if (isSSL()) {
+            try {
+                if (getSSLKeystore() != null) {
+                    socket = SSLUtil.createSocketFactory(
+                            getSSLKeystore(),
+                            getSSLKeystorePassword(),
+                            getSSLKeyPassword()
+                    ).createSocket(address, port);
+                } else {
+                    socket = SSLUtil.getDefaultSocketFactory().createSocket(address, port);
+                }
+            } catch (Exception e) {
+                throw new IOException("Failed to create SSL socket", e);
+            }
+        } else {
+            socket = new Socket(address, port);
+        }
+
+        return socket;
     }
 
     public static class Builder<B extends Builder<?>> extends WorkerOptions.Builder<B> {

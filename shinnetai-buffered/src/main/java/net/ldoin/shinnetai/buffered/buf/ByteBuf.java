@@ -233,15 +233,19 @@ public class ByteBuf implements Buffered, Cloneable {
         return (ByteBuf) super.clone();
     }
 
-    protected void expand(int to) {
-        int old = bytes.length;
-        to = old + to;
-        if (old >= to) {
+    protected void expand(int additional) {
+        int needed = writeIndex + additional;
+        if (needed <= bytes.length) {
             return;
         }
 
-        byte[] newArray = new byte[to];
-        System.arraycopy(bytes, 0, newArray, 0, old);
+        int newCapacity = bytes.length == 0 ? 16 : bytes.length;
+        while (newCapacity < needed) {
+            newCapacity <<= 1;
+        }
+
+        byte[] newArray = new byte[newCapacity];
+        System.arraycopy(bytes, 0, newArray, 0, bytes.length);
 
         bytes = newArray;
     }

@@ -51,7 +51,7 @@ public class IdGenerator {
         nextId.set(0);
     }
 
-    private boolean markAllocated(int id) {
+    private synchronized boolean markAllocated(int id) {
         int word = id >>> 6;
         long mask = 1L << (id & 63);
         while (true) {
@@ -66,7 +66,7 @@ public class IdGenerator {
         }
     }
 
-    private boolean unmarkAllocated(int id) {
+    private synchronized boolean unmarkAllocated(int id) {
         int word = id >>> 6;
         long mask = 1L << (id & 63);
         while (true) {

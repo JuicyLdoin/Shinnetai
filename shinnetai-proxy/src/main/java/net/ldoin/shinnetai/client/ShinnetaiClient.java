@@ -9,6 +9,9 @@ import net.ldoin.shinnetai.packet.side.PacketSide;
 import net.ldoin.shinnetai.statistic.client.ShinnetaiClientStatistic;
 import net.ldoin.shinnetai.worker.ShinnetaiIOWorker;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Set;
@@ -47,7 +50,24 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
         super(logger, registry, socket.getInputStream(), socket.getOutputStream(), new ShinnetaiClientStatistic(), options);
         this.options = options;
         this.socket = socket;
-        this.startData = SmartByteBuf.empty().writeVarInt(connectionType.ordinal()).writeVarInt(options.getId());
+
+        if (socket instanceof SSLSocket sslSocket) {
+            try {
+                sslSocket.startHandshake();
+                logger.info("SSL handshake completed with " +
+                        socket.getInetAddress() + ":" + socket.getPort());
+            } catch (SSLHandshakeException e) {
+                logger.log(Level.SEVERE, "SSL handshake failed: " + e.getMessage(), e);
+                throw e;
+            } catch (SSLException e) {
+                logger.log(Level.SEVERE, "SSL connection error: " + e.getMessage(), e);
+                throw e;
+            }
+        }
+
+        this.startData = SmartByteBuf.empty()
+                .writeVarInt(connectionType.ordinal())
+                .writeVarInt(options.getId());
 
         if (connectionType == ConnectionType.CLIENT && options.isClustering()) {
             Set<String> clusterGroups = options.getClusterGroups();
@@ -83,7 +103,6 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
         if (!options.isClustering()) {
             throw new UnsupportedOperationException("Client is not connected to the cluster");
         }
-
         return clusterGroup;
     }
 
@@ -104,7 +123,7 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
     public void redirect(String clusterGroup, String address, int port) throws IOException {
         redirecting = true;
 
-        boolean debug = !options.getAddress().equals(address) && options.getPort() != port;
+        boolean debug = !options.getAddress().equals(address) || options.getPort() != port;
         if (debug) {
             getLogger().info(String.format("Redirecting to %s:%d...", address, port));
         }
@@ -113,13 +132,23 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
         clearIO();
         Thread.interrupted();
 
-        socket = new Socket(address, port);
+        socket = options.toSocket();
+        if (socket instanceof SSLSocket sslSocket) {
+            try {
+                sslSocket.startHandshake();
+                getLogger().info("SSL handshake completed on redirect");
+            } catch (SSLException e) {
+                getLogger().log(Level.SEVERE, "SSL handshake failed on redirect: " + e.getMessage(), e);
+                throw e;
+            }
+        }
+
         attachIOStreams(socket);
         start();
 
         this.clusterGroup = clusterGroup;
         if (debug) {
-            getLogger().info("Redirected");
+            getLogger().info("Redirected successfully");
         }
 
         redirecting = false;
@@ -137,13 +166,13 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
                 Thread.sleep(100);
             } catch (InterruptedException ignored) {
             } catch (Exception exception) {
-                getLogger().log(Level.SEVERE, "Error while close connection", exception);
+                getLogger().log(Level.SEVERE, "Error while closing connection", exception);
             }
         } else if (options.isClustering() && options.isRedirecting() && !redirecting) {
             try {
                 redirect(null, options.getAddress(), options.getPort());
             } catch (IOException exception) {
-                getLogger().log(Level.SEVERE, "Error while trying redirect to cluster", exception);
+                getLogger().log(Level.SEVERE, "Error while trying to redirect to cluster", exception);
             }
         } else {
             disconnect();
