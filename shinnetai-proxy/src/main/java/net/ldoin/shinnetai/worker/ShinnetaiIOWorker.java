@@ -196,7 +196,12 @@ public abstract class ShinnetaiIOWorker<S extends ShinnetaiStatistic> extends Sh
                     continue;
                 }
 
-                short length = (short) (((lengthBuf[0] & 0xFF) << 8) | (lengthBuf[1] & 0xFF));
+                int length = ((lengthBuf[0] & 0xFF) << 8) | (lengthBuf[1] & 0xFF);
+                if (length > options.getMaxPacketSize()) {
+                    getLogger().log(Level.WARNING, "Packet too large: " + length + " > " + options.getMaxPacketSize());
+                    continue;
+                }
+                
                 byte[] packetBuf = input.readNBytes(length);
                 if (packetBuf.length != length) {
                     continue;

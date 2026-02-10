@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "net.ldoin"
-version = "1.6.2"
+version = "1.6.3"
 
 repositories {
     mavenCentral()
@@ -20,6 +20,12 @@ subprojects {
 
     apply(plugin = "java")
     apply(plugin = "maven-publish")
+
+    configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    }
 
     repositories {
         mavenCentral()

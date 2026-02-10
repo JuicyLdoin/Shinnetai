@@ -145,21 +145,20 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
                     int id;
                     ConnectionType connectionType;
 
-                    byte[] readBuffer;
+                    byte[] readBuffer = new byte[1024];
                     ReadOnlySmartByteBuf data;
-                    while (true) {
-                        int available = input.available();
-                        if (available > 0) {
-                            readBuffer = new byte[available];
-                            int bytesRead = input.read(readBuffer);
-                            if (bytesRead > 0) {
-                                data = ReadOnlySmartByteBuf.of(readBuffer);
-                                connectionType = ConnectionType.VALUES[data.readVarInt()];
-                                id = data.readVarInt();
-                                break;
-                            }
-                        }
+                    
+                    int bytesRead = input.read(readBuffer);
+                    if (bytesRead == -1) {
+                        break; // Or throw IOException
                     }
+
+                    byte[] actualData = new byte[bytesRead];
+                    System.arraycopy(readBuffer, 0, actualData, 0, bytesRead);
+                    
+                    data = ReadOnlySmartByteBuf.of(actualData);
+                    connectionType = ConnectionType.VALUES[data.readVarInt()];
+                    id = data.readVarInt();
 
                     C connection = newConnection(clientSocket, connectionType, data);
                     try {

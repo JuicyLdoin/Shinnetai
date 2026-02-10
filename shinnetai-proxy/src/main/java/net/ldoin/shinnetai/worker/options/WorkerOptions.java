@@ -22,6 +22,7 @@ public class WorkerOptions {
     private final String sslKeystorePassword;
     private final String sslKeyPassword;
     private final ShinnetaiPipeline pipeline;
+    private final int maxPacketSize;
 
     protected WorkerOptions(Builder<?> builder) {
         this.readerThreads = builder.readerThreads;
@@ -32,10 +33,15 @@ public class WorkerOptions {
         this.sslKeystorePassword = builder.sslKeystorePassword;
         this.sslKeyPassword = builder.sslKeyPassword;
         this.pipeline = builder.pipeline;
+        this.maxPacketSize = builder.maxPacketSize;
     }
 
     public int getReaderThreads() {
         return readerThreads;
+    }
+    
+    public int getMaxPacketSize() {
+        return maxPacketSize;
     }
 
     public int getWriterThreads() {
@@ -76,9 +82,15 @@ public class WorkerOptions {
         private String sslKeystorePassword;
         private String sslKeyPassword;
         private ShinnetaiPipeline pipeline;
+        private int maxPacketSize = 64 * 1024;
 
         public B setReaderThreads(int readerThreads) {
             this.readerThreads = readerThreads;
+            return self();
+        }
+        
+        public B setMaxPacketSize(int maxPacketSize) {
+            this.maxPacketSize = maxPacketSize;
             return self();
         }
 
