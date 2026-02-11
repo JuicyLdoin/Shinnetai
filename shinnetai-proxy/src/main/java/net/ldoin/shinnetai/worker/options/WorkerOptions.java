@@ -23,6 +23,8 @@ public class WorkerOptions {
     private final String sslKeyPassword;
     private final ShinnetaiPipeline pipeline;
     private final int maxPacketSize;
+    private final int readTimeout;
+    private final boolean keepAlive;
 
     protected WorkerOptions(Builder<?> builder) {
         this.readerThreads = builder.readerThreads;
@@ -34,6 +36,8 @@ public class WorkerOptions {
         this.sslKeyPassword = builder.sslKeyPassword;
         this.pipeline = builder.pipeline;
         this.maxPacketSize = builder.maxPacketSize;
+        this.readTimeout = builder.readTimeout;
+        this.keepAlive = builder.keepAlive;
     }
 
     public int getReaderThreads() {
@@ -42,6 +46,14 @@ public class WorkerOptions {
     
     public int getMaxPacketSize() {
         return maxPacketSize;
+    }
+
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+
+    public boolean isKeepAlive() {
+        return keepAlive;
     }
 
     public int getWriterThreads() {
@@ -75,6 +87,8 @@ public class WorkerOptions {
     public static class Builder<B extends Builder<?>> {
 
         private int readerThreads = 1;
+        private int readTimeout = 30000;
+        private boolean keepAlive = true;
         private int writerThreads = 1;
         private boolean virtualThreads = true;
         private boolean sslSocket = false;
@@ -91,6 +105,16 @@ public class WorkerOptions {
         
         public B setMaxPacketSize(int maxPacketSize) {
             this.maxPacketSize = maxPacketSize;
+            return self();
+        }
+
+        public B setReadTimeout(int readTimeout) {
+            this.readTimeout = readTimeout;
+            return self();
+        }
+
+        public B setKeepAlive(boolean keepAlive) {
+            this.keepAlive = keepAlive;
             return self();
         }
 

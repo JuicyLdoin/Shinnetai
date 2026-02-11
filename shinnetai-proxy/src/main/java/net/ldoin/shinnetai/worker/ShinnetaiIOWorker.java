@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -188,26 +190,50 @@ public abstract class ShinnetaiIOWorker<S extends ShinnetaiStatistic> extends Sh
         writerExecutor.execute(this::writerLoop);
     }
 
+    private int readFully(byte[] buffer, int offset, int length) throws IOException {
+        int totalRead = 0;
+        while (totalRead < length && running.get()) {
+            int read = input.read(buffer, offset + totalRead, length - totalRead);
+            if (read == -1) {
+                return totalRead;
+            }
+
+            totalRead += read;
+        }
+
+        return totalRead;
+    }
+    
     private void readerLoop() {
+        byte[] reusedBuffer = new byte[options.getMaxPacketSize()];
         try {
             while (running.get()) {
-                byte[] lengthBuf = input.readNBytes(2);
-                if (lengthBuf.length != 2) {
-                    continue;
+                try {
+                    int bytesRead = readFully(reusedBuffer, 0, 2);
+                    if (bytesRead < 2) {
+                        break;
+                    }
+                } catch (IOException e) {
+                   break;
                 }
 
-                int length = ((lengthBuf[0] & 0xFF) << 8) | (lengthBuf[1] & 0xFF);
+                int length = ((reusedBuffer[0] & 0xFF) << 8) | (reusedBuffer[1] & 0xFF);
                 if (length > options.getMaxPacketSize()) {
                     getLogger().log(Level.WARNING, "Packet too large: " + length + " > " + options.getMaxPacketSize());
                     continue;
                 }
-                
-                byte[] packetBuf = input.readNBytes(length);
-                if (packetBuf.length != length) {
-                    continue;
+
+                try {
+                    int bytesRead = readFully(reusedBuffer, 0, length);
+                    if (bytesRead < length) {
+                        break;
+                    }
+                } catch (IOException e) {
+                   break;
                 }
 
-                ReadPacket readPacket = readPacket(packetBuf);
+                byte[] packetData = Arrays.copyOf(reusedBuffer, length);
+                ReadPacket readPacket = readPacket(packetData);
                 if (readPacket == null) {
                     continue;
                 }
@@ -233,6 +259,7 @@ public abstract class ShinnetaiIOWorker<S extends ShinnetaiStatistic> extends Sh
                     handlePacket(readPacket);
                 }
             }
+        } catch (SocketTimeoutException e) {
         } catch (Exception e) {
             if (running.get()) {
                 getLogger().log(Level.SEVERE, "Reader error", e);

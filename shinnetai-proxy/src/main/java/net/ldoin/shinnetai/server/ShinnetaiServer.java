@@ -130,6 +130,15 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
             while (running) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    try {
+                        clientSocket.setSoTimeout(options.getReadTimeout());
+                        clientSocket.setKeepAlive(options.isKeepAlive());
+                    } catch (SocketException e) {
+                        logger.log(Level.WARNING, "Failed to apply socket options", e);
+                        clientSocket.close();
+                        continue;
+                    }
+
                     if (clientSocket instanceof SSLSocket sslSocket) {
                         try {
                             sslSocket.startHandshake();
@@ -141,24 +150,18 @@ public class ShinnetaiServer<C extends ShinnetaiConnection<?>> implements Runnab
                     }
 
                     InputStream input = clientSocket.getInputStream();
-
-                    int id;
-                    ConnectionType connectionType;
-
                     byte[] readBuffer = new byte[1024];
-                    ReadOnlySmartByteBuf data;
-                    
                     int bytesRead = input.read(readBuffer);
                     if (bytesRead == -1) {
-                        break; // Or throw IOException
+                        break;
                     }
 
                     byte[] actualData = new byte[bytesRead];
                     System.arraycopy(readBuffer, 0, actualData, 0, bytesRead);
-                    
-                    data = ReadOnlySmartByteBuf.of(actualData);
-                    connectionType = ConnectionType.VALUES[data.readVarInt()];
-                    id = data.readVarInt();
+
+                    ReadOnlySmartByteBuf data = ReadOnlySmartByteBuf.of(actualData);
+                    ConnectionType connectionType = ConnectionType.VALUES[data.readVarInt()];
+                    int id = data.readVarInt();
 
                     C connection = newConnection(clientSocket, connectionType, data);
                     try {

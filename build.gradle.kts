@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "net.ldoin"
-version = "1.6.3"
+version = "1.6.4"
 
 repositories {
     mavenCentral()

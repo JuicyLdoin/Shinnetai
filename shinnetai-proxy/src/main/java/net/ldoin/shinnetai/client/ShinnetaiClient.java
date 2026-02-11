@@ -14,6 +14,7 @@ import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -50,6 +51,13 @@ public class ShinnetaiClient extends ShinnetaiIOWorker<ShinnetaiClientStatistic>
         super(logger, registry, socket.getInputStream(), socket.getOutputStream(), new ShinnetaiClientStatistic(), options);
         this.options = options;
         this.socket = socket;
+
+        try {
+            socket.setSoTimeout(options.getReadTimeout());
+            socket.setKeepAlive(options.isKeepAlive());
+        } catch (SocketException e) {
+            logger.log(Level.WARNING, "Failed to apply socket options", e);
+        }
 
         if (socket instanceof SSLSocket sslSocket) {
             try {
